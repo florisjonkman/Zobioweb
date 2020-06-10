@@ -1,0 +1,23 @@
+{
+  "files": {
+    "main.js": "/static/js/main.bcd058b8.chunk.js",
+    "main.js.map": "/static/js/main.bcd058b8.chunk.js.map",
+    "runtime-main.js": "/static/js/runtime-main.8dc0443e.js",
+    "runtime-main.js.map": "/static/js/runtime-main.8dc0443e.js.map",
+    "static/js/2.b4c71314.chunk.js": "/static/js/2.b4c71314.chunk.js",
+    "static/js/2.b4c71314.chunk.js.map": "/static/js/2.b4c71314.chunk.js.map",
+    "index.html": "/index.html",
+    "precache-manifest.76f967a58509211ac7777a9a473b694a.js": "/precache-manifest.76f967a58509211ac7777a9a473b694a.js",
+    "service-worker.js": "/service-worker.js",
+    "static/js/2.b4c71314.chunk.js.LICENSE.txt": "/static/js/2.b4c71314.chunk.js.LICENSE.txt",
+    "static/media/FridgeIn2.svg": "/static/media/FridgeIn2.22ff45d4.svg",
+    "static/media/FridgeOut2.svg": "/static/media/FridgeOut2.fc1742cc.svg",
+    "static/media/ZobioLogo.svg": "/static/media/ZobioLogo.41100ac4.svg",
+    "static/media/ZobioLogo_Flat.svg": "/static/media/ZobioLogo_Flat.c938947b.svg"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.8dc0443e.js",
+    "static/js/2.b4c71314.chunk.js",
+    "static/js/main.bcd058b8.chunk.js"
+  ]
+}

@@ -93,7 +93,6 @@ function Login(props) {
         console.log(response);
         if (response.status == 200 && response.statusText == "OK") {
           console.log(response.data["message"]);
-          console.log(response.data["output"]['userData']);
           Auth.setAuth(true);
           Cookies.set("username", response.data["output"]['userData']['username'], { expires: 1 });
           Cookies.set("fullname", response.data["output"]['userData']['cn'], { expires: 1 });
