@@ -22,7 +22,7 @@ import {
   fetchProjects,
   fetchPosition,
   fetchLastPosition,
-} from "./Functions/ApiFunctions";
+} from "../ApiFunctions";
 import {
   isBarcodeUnique,
   formatDate,

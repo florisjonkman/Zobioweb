@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Cookies from "js-cookie";
 import axios from "axios";
-import forge from "node-forge"
+import forge from "node-forge";
 
 import { makeStyles, useTheme } from "@material-ui/core/styles";
 import Button from "@material-ui/core/Button";
@@ -16,6 +16,7 @@ import Container from "@material-ui/core/Container";
 
 import AuthApi from "./AuthApi";
 import ZobioLogo from "./img/ZobioLogo.svg";
+import { fetchCheckLDAP } from "./ApiFunctions";
 
 const useStyles = makeStyles((theme) => ({
   paper: {
@@ -60,42 +61,25 @@ function Login(props) {
     }
   };
 
-  const fetchCheckLDAP = async () => {
-    console.log("Fetching checking ldap account...");
-    setIsLoading(true);
-
-    const publicKey = forge.pki.publicKeyFromPem(process.env.REACT_APP_PUBLIC_KEY);
-    const encryptedPassword = publicKey.encrypt(password, "RSA-OAEP", {
-            md: forge.md.sha256.create(),
-            mgf1: forge.mgf1.create()
-        });
-    const base64 = forge.util.encode64(encryptedPassword);
-
-    const request = await axios({
-      url: "http://localhost:5000/login",
-      method: "post",
-      auth: {
-        username: username,
-        password: base64,
-      },
-    });
-
-    setIsLoading(false);
-    return request;
-  };
-
   const onSubmit = (event) => {
     event.preventDefault();
     const { history } = props;
 
-    fetchCheckLDAP()
+    setIsLoading(true);
+    fetchCheckLDAP(username, password)
       .then((response) => {
         console.log(response);
         if (response.status == 200 && response.statusText == "OK") {
           console.log(response.data["message"]);
           Auth.setAuth(true);
-          Cookies.set("username", response.data["output"]['userData']['username'], { expires: 1 });
-          Cookies.set("fullname", response.data["output"]['userData']['cn'], { expires: 1 });
+          Cookies.set(
+            "username",
+            response.data["output"]["userData"]["username"],
+            { expires: 1 }
+          );
+          Cookies.set("fullname", response.data["output"]["userData"]["cn"], {
+            expires: 1,
+          });
           Cookies.set("authentication", true, { expires: 1 });
           Cookies.set("token", response.data["output"]["token"], {
             expires: 1,
@@ -105,6 +89,7 @@ function Login(props) {
         } else {
           console.error("ERROR: Request succeeded, but status not 200");
           console.error(response);
+          setIsLoading(false);
         }
       })
       .catch((error) => {

@@ -1,19 +1,21 @@
 import time
 import datetime
 import jwt
-import ldap_connection
 import json
+import logging
 from flask import Flask, request, make_response
 from flask_cors import CORS
 from functools import wraps
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.Hash import SHA256
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.backends import default_backend
 from base64 import b64decode
 
+import ldap_connection
 from api_cdd import ApiCDD
 from box_functions_9x9 import *
-from ldap_connection import ldap_connection, PUBLIC_KEY, PRIVATE_KEY
+from ldap_connection import ldap_connection, PRIVATE_KEY
 
 """
     Conventions:
@@ -34,8 +36,20 @@ from ldap_connection import ldap_connection, PUBLIC_KEY, PRIVATE_KEY
         500     --  Internal Server Error   -- The request was not completed due to an internal error on the server side.
 """
 
+# Set logging
+filename = 'server.py'
+logger = logging.getLogger("server.py")
+logger.setLevel(level=logging.INFO)  # When debugging put to loggin.DEBUG
+formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s",
+                              "%Y-%m-%d %H:%M:%S")
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
 # Load CDD Vault, token and secret key
-with open('./ssl/requirements.txt') as json_file:
+# /var/www/backend/ssl/requirements.txt
+ssl_dir = "../ssl/"
+with open(ssl_dir + 'requirements.txt') as json_file:
     requirements = json.load(json_file)
     BASE_URL = "https://app.collaborativedrug.com/api/v1/vaults/%s/" % (
         requirements['cdd_vault_id'])
@@ -68,14 +82,17 @@ def make_response_object(status, message=None, request=None, output=None, post_d
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('authorization')
+        token = request.headers['Token']
 
         if not token:
+            logger.critical('%s  %s', filename, 'Token is missing')
             return make_response_object(401, 'Token is missing')
 
         try:
+            logger.debug('%s  %s', filename, 'Token valid')
             data = jwt.decode(token, app.config['SECRET_KEY'])
-        except:
+        except Exception as e:
+            logger.critical('%s  %s  %s', filename, 'Token invalid', e)
             return make_response_object(401, 'Token is invalid')
 
         return f(*args, **kwargs)
@@ -97,6 +114,7 @@ def get_projects():
 
     cdd_request = ApiCdd.get_projects()
 
+    logger.debug('%s  %s', filename, cdd_request['message'])
     return make_response_object(status=cdd_request['status'], message=cdd_request['message'], request=cdd_request['request'], output=cdd_request['cddResponse'])
 
 
@@ -112,6 +130,7 @@ def get_vials():
     """
     cdd_request = ApiCdd.get_vials()
 
+    logger.debug('%s  %s', filename, cdd_request['message'])
     return make_response_object(status=cdd_request['status'], message=cdd_request['message'], request=cdd_request['request'], output=cdd_request['cddResponse'])
 
 
@@ -129,17 +148,18 @@ def get_location():
     # Get input from POST-request
     post_data = request.json
 
-    print('\npost_data')
-    print(post_data)
+    # print('\npost_data')
+    # print(post_data)
 
     try:
         # Try to get id and name of project
         request_project_id = post_data['project']['id']
         request_project_name = post_data['project']['name']
         request_barcode = post_data['barcode']
-    except:
+    except Exception as e:
         # Else, return
         message = 'Failed: [project][id] or [project][name] or [barcode] not in post data'
+        logger.critical('%s  %s  %s', filename, message, e)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -160,6 +180,7 @@ def get_location():
                              'Checked out', 'Registered']
     else:
         message = 'Failed: scan type \'{0}\' is not valid'.format(scan_type)
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -172,6 +193,7 @@ def get_location():
     if(cdd_response['status'] != 200):
         # If request failed at CDD API Class, return
         message = 'Error: cdd_response[\'status\']  failed'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=500, message=message, request=cdd_response, post_data=post_data)
         return response
@@ -193,33 +215,27 @@ def get_location():
         if(request_barcode == cdd_barcode):
             # Barcode found in CDD
             output['isInCDD'] = True
+            logger.debug('%s  %s', filename,
+                         'barcode {0} found in CDD'.format(cdd_barcode))
 
             # Check 2
             if(request_project_id == cdd_project_id):
                 # Vial project in CDD matches project of scanned barcode
+                logger.debug('%s  %s', filename, 'barcode {0} found in correct project {1}'.format(
+                    cdd_barcode, cdd_project_id))
                 output['isInCorrectProject'] = True
 
             # Check 3
             if(cdd_status in allowed_statusses):
                 # Status of vial in CDD is correct
+                logger.debug(
+                    '%s  %s', filename, 'barcode {0} status allowed'.format(cdd_barcode))
                 output['isCorrectStatus'] = True
                 if(scan_type != 'Add'):
                     output['locationArray'] = location_string_to_array(
                         vial['Location'])
 
             break
-
-    # if(scan_type == 'Add'):
-    #     request_last_location = get_last_location()
-    #     if(request_last_location.status_code != 200):
-    #         # Request failed, return
-    #         message = 'Error: could not find last location'
-    #         response = make_response_object(
-    #             status=500, message=message, post_data=post_data)
-    #         return response
-
-    #     output['locationArray'] = request_last_location.json[
-    #         'output']['last location']
 
     return make_response_object(status=200, message='Success', output=output, post_data=post_data)
 
@@ -241,16 +257,15 @@ def get_last_location():
 
     # Get input from POST-request
     post_data = request.json
-    print('\npost_data')
-    print(post_data)
 
     try:
         # Try to get id and name of project
         request_project_id = post_data['id']
         request_project_name = post_data['name']
-    except:
+    except Exception as e:
         # Else, return
         message = 'Failed: \'id\' not in post data'
+        logger.critical('%s  %s  %s', filename, message, e)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -261,6 +276,7 @@ def get_last_location():
     if(cdd_response['status'] != 200):
         # Request failed, return
         message = 'Error: cdd_response[\'status\'] failed'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=500, message=message, request=cdd_response, post_data=post_data)
         return response
@@ -274,6 +290,7 @@ def get_last_location():
 
     message = 'Succesfully acquired last postion of project: {0} (id={1}), last postion: {0}-{2}-{3}'.format(
         request_project_name, request_project_id, last_box, last_pos)
+    logger.debug('%s  %s', filename, message)
     response = make_response_object(200, message=message, output={
         'last location': [
             request_project_name, last_box, last_pos]}, post_data=post_data)
@@ -309,6 +326,7 @@ def validate_barcodes():
     if((not post_data) or (len(post_data) == 0)):
         # If no barcodes were found in data, return
         message = 'Failed: Number of scanned items in post data is 0'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -316,6 +334,7 @@ def validate_barcodes():
     if(cdd_response['status'] != 200):
         # If request failed at CDD API Class, return
         message = 'Error: cdd_response[\'status\']  failed'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=500, message=message, request=cdd_response, post_data=post_data)
         return response
@@ -364,16 +383,22 @@ def validate_barcodes():
             if(scanned_barcode == cdd_barcode):
                 # Barcode found in CDD
                 is_in_CDD = True
+                logger.debug('%s  %s', filename,
+                             'barcode {0} found in CDD'.format(cdd_barcode))
 
                 # Check 2
                 if(scanned_project != cdd_project):
                     # Vial project in CDD matches project of scanned barcode
                     is_in_correct_project = False
+                    logger.debug('%s  %s', filename, 'barcode {0} NOT found in correct project {1}'.format(
+                        cdd_barcode, cdd_project))
 
                 # Check 3
                 if(cdd_status != 'Registered'):
                     # Status of vial in CDD is 'Registered'
                     is_registered = False
+                    logger.debug('%s  %s', filename, 'barcode {0} NOT registered'.format(
+                        cdd_barcode))
 
                 break
 
@@ -442,6 +467,7 @@ def submit_data_to_CDD():
     if((not post_data) or (len(post_data['data']) == 0)):
         # If no barcodes were found in data, return
         message = 'Failed: Number of scanned items in post data is 0'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -466,6 +492,7 @@ def submit_data_to_CDD():
                              'Checked out', 'Registered']
     else:
         message = 'Failed: scan type \'{0}\' is not valid'.format(scan_type)
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=400, message=message, post_data=post_data)
         return response
@@ -473,6 +500,7 @@ def submit_data_to_CDD():
     if(cdd_response['status'] != 200):
         # If request failed at CDD API Class, return
         message = 'Error: cdd_response[\'status\']  failed'
+        logger.critical('%s  %s', filename, message)
         response = make_response_object(
             status=500, message=message, request=cdd_response, post_data=post_data)
         return response
@@ -521,23 +549,24 @@ def submit_data_to_CDD():
             # Check 1
             if(scanned_barcode == cdd_barcode):
                 # Barcode found in CDD
-                print('Barcode found in CDD')
+                # print('Barcode found in CDD')
                 is_in_CDD = True
+                logger.debug('%s  %s', filename,
+                             'barcode {0} found in CDD'.format(cdd_barcode))
 
                 # Check 2
                 if(scanned_project_id != cdd_project_id):
                     # Vial project in CDD matches project of scanned barcode
-                    print('\'{0}\' ({1}),\'{2}\' ({3})'.format(
-                        scanned_project_name, scanned_project_id, cdd_project_name, cdd_project_id))
-                    print('Barcode found wrong project')
                     is_in_correct_project = False
+                    logger.debug('%s  %s', filename, 'barcode {0} found in correct project {1}'.format(
+                        cdd_barcode, cdd_project_name))
 
                 # Check 3
                 if(cdd_status not in allowed_statusses):
-                    print(cdd_status, allowed_statusses)
-                    print('Barcode has incorrect status')
                     # Status of vial in CDD is 'Registered'
                     is_correct_status = False
+                    logger.debug(
+                        '%s  %s', filename, 'barcode {0} status NOT allowed {1}'.format(cdd_barcode))
 
                 item_data = {'id': cdd_batch_id, 'barcode': scanned_barcode, 'project': {
                     'id': cdd_project_id, 'name': cdd_project}, 'status': cdd_status, 'location': cdd_location, 'post response': {'status': None, 'message': None, 'response': None}}
@@ -561,20 +590,25 @@ def submit_data_to_CDD():
             if(cdd_put_response['status'] == 200):
                 item_data['post response']['status'] = 200
                 item_data['post response']['message'] = 'Successfully submitted to CDD API'
-
+                logger.info('%s  %s  %s  %s', filename, item_data['post response']['message'], 'barcode:{0} cdd_batch_id:{1} type:{2}'.format(
+                    scanned_barcode, cdd_batch_id, scan_type), json.dumps(post_data_batch))
                 success_vials.append(item_data)
             else:
                 item_data['post response']['status'] = cdd_put_response['status']
                 item_data['post response']['message'] = 'Failed to submit to CDD API'
                 item_data['post response']['response'] = cdd_put_response
-
+                logger.error('%s  %s  %s  %s', filename, item_data['post response']['message'], 'barcode: {0} cdd_batch_id:{1} type:{2}'.format(
+                    scanned_barcode, cdd_batch_id, scan_type), json.dumps(post_data_batch))
+                success_vials.append(item_data)
                 all_succeeded = False
                 failed_vials.append(item_data)
         else:
             item_data['post response']['status'] = 500
             item_data['post response']['message'] = "Did not pass all checks, the second time"
+            logger.critical('%s  %s', filename,
+                            item_data['post response']['message'])
             item_data['post response']['response'] = None
-            print(item_data['post response']['message'])
+            # print(item_data['post response']['message'])
 
             all_succeeded = False
             failed_vials.append(item_data)
@@ -586,6 +620,7 @@ def submit_data_to_CDD():
 
     message = 'Success: items submited, {0} fails'.format(
         len(failed_vials))
+    logger.debug('%s  %s', filename, message)
     response = make_response_object(
         200, message=message, output=output, post_data=post_data)
 
@@ -600,23 +635,32 @@ def login():
         dic -- response, see make_response_object()
     """
     # POST Authorization input {username, password [ENCRYPTED]}
-    auth = request.authorization
+    headers = request.headers
 
-    # Decrypt password
-    private_key = RSA.importKey(PRIVATE_KEY)
-    cipher = PKCS1_OAEP.new(private_key, hashAlgo=SHA256)
-    decrypt_pass = cipher.decrypt(b64decode(auth.password))
+    # Load private key as serialization object
+    private_key = serialization.load_pem_private_key(
+        PRIVATE_KEY,
+        password=None,
+        backend=default_backend()
+    )
+
+    # Decrypt passsword in bytes
+    decrypt_pass_bytes = private_key.decrypt(
+        b64decode(headers['password']),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+
+    # return make_response_object(status=200, message='{0} {1} {2} {3} {4} {5}'.format(headers['password'], type(headers['password']), headers['username'], type(headers['username']), decodings, type(decodings)))
+
+    # Convert to string
+    decrypt_pass = decrypt_pass_bytes.decode('utf-8')
 
     # Connect with LDAP
-    ldap_response = ldap_connection(auth.username, decrypt_pass)
-
-    # print('Encrypted password: ')
-    # print("{0}\n(type: {1})".format(auth.password, type(auth.password)))
-    # print('Private key: ')
-    # print("{0}\n(type: {1})".format(
-    #     PRIVATE_KEY, type(PRIVATE_KEY)))
-    # print('Decrypted message: ')
-    # print("{0}\n(type: {1})\n".format(decrypt_pass, type(decrypt_pass)))
+    ldap_response = ldap_connection(headers['username'], decrypt_pass)
 
     if(ldap_response['status']):
         token = jwt.encode(
@@ -626,10 +670,21 @@ def login():
         return make_response_object(status=401, message=ldap_response['message'])
 
 
-# private_key = RSA.importKey(PRIVATE_KEY)
-# cipher = PKCS1_OAEP.new(private_key)
-# decryptmessage = cipher.decrypt(ciphertext).decode()
-# print('Private key: ')
-# print("{0}\n".format(private_key_string))
-# print('Decrypted message: ')
-# print("{0}\n(type: {1})\n".format(decryptmessage, type(decryptmessage)))
+@ app.route('/')
+def home():
+    return """
+    <html>
+        <head>
+            <title>Zobioweb Backend</title>
+        </head>
+        <body>
+            <h1>Api connections</h1>
+            <a href="https://192.168.60.12:8080/login" target="_blank">/login</a> Login connection to LDAP | POST | header = {username, password} <br>
+            <a href="https://192.168.60.12:8080/projects" target="_blank">/projects</a> Get projects of vault | GET | Token required | header = {Token} <br>
+            <a href="https://192.168.60.12:8080/vialbarcodes" target="_blank">/vialbarcodes</a> Get batch barcodes of vault | GET | Token required | header = {Token} <br>
+            <a href="https://192.168.60.12:8080/getlocation" target="_blank">/getlocation</a> Get location barcode | POST | Token required | header = {Token} | data = {type, project, barcode} <br>
+            <a href="https://192.168.60.12:8080/getlastlocation" target="_blank">/getlastlocation</a> Get last occupied location of project | POST | Token required | header = {Token} | data = {selectedProject} <br>
+            <a href="https://192.168.60.12:8080/submitdata" target="_blank">/projects</a> Submit data to CDD Vault | POST | Token required | header = {Token} | data = {type,data} <br>
+        </body>
+    </html>
+"""

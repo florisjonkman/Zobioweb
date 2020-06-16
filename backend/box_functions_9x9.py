@@ -1,3 +1,16 @@
+import logging
+
+# Set logging
+filename = 'box_functions_9x9.py'
+logger = logging.getLogger(filename)
+logger.setLevel(level=logging.INFO)  # When debugging put to loggin.DEBUG
+formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s",
+                              "%Y-%m-%d %H:%M:%S")
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+
 def location_string_to_array(location):
     """ Turns FJM1-1-A1 string into array [FJM,1,11]
         Location convention: '<project name>'-'<box>'-'<pos>'
@@ -18,7 +31,7 @@ def location_string_to_array(location):
         pos_int = map_pos_string_to_interger(pos_str)
         box_int = int(box_str)
     except Exception as e:
-        print(e)
+        logger.critical('%s  %s', filename, e)
 
     return [project_name, box_int, pos_int]
 
@@ -50,8 +63,9 @@ def get_last_location_from_batches(batches, request_project_name):
 
         if(name != request_project_name):
             # This can NEVER occur, to be sure output when it happens
-            print(
-                'box_function_9x9: get_last_location_from_batches: Strange: LocationPrefix is not the same as request_project_name, cdd_project_name = {0}, request_project_name = {1}!'.format(name, request_project_name))
+            message = 'box_function_9x9: get_last_location_from_batches: Strange: LocationPrefix is not the same as request_project_name, cdd_project_name = {0}, request_project_name = {1}!'.format(
+                name, request_project_name)
+            logger.warning('%s  %s', filename, message)
 
         # Calculate last location
         last_box, last_pos = latest_location(
@@ -116,8 +130,8 @@ def latest_location(box, pos, last_box, last_pos):
         last_box ,last_pos {int,int}
     """
 
-    print('get_latest_location(%d,%d,%d,%d)' %
-          (box, pos, last_box, last_pos))
+    # print('get_latest_location(%d,%d,%d,%d)' %
+    #       (box, pos, last_box, last_pos))
     if(box < last_box):
         # box is below, last_box, do no change anything
         return last_box, last_pos
@@ -137,5 +151,5 @@ def latest_location(box, pos, last_box, last_pos):
             # pos is later than last_pos, change last_pos
             last_pos = pos
 
-    print('> return %d %d' % (last_box, last_pos))
+    # print('> return %d %d' % (last_box, last_pos))
     return last_box, last_pos

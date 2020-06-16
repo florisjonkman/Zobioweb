@@ -20,7 +20,7 @@ import {
   fetchSendData,
   fetchProjects,
   fetchPosition,
-} from "./Functions/ApiFunctions";
+} from "../ApiFunctions";
 import {
   isBarcodeUnique,
   formatDate,
