@@ -2,7 +2,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import forge from "node-forge";
 
-const host = "http://localhost:5000"; // "http://localhost:5000" // "http://192.168.60.12:8080"
+const host = "http://192.168.60.12:8080"; // "http://localhost:5000" // "http://192.168.60.12:8080"
 
 // Asynchronous function to login to LDAP of Zobio
 export async function fetchCheckLDAP(username, password) {

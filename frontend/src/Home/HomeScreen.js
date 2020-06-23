@@ -92,7 +92,7 @@ function HomeScreen({ handleChangePage }) {
                 </Avatar>
               }
               title="Check-in"
-              subheader="Scan unused vials and place them in the fridge"
+              subheader="Scan vials and place them back into the fridge"
             />
           </Link>
         </CardActionArea>

@@ -1,6 +1,16 @@
 import requests
 import time
 import json
+import logging
+
+# Set logging
+filename = 'api_cdd.py'
+logger = logging.getLogger(filename)
+logger.setLevel(level=logging.INFO)  # When debugging put to loggin.DEBUG
+formatter = logging.Formatter("%(levelname)s | %(message)s")
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 
 class ApiCDD():
@@ -149,19 +159,19 @@ class ApiCDD():
         dic = self.make_get_request(get_url)
         if(dic['status'] != 200):
             # Request failed, return
-            print(dic['message'])
+            logger.critical('%s | %s', filename, print(dic['message']))
             return dic
 
         if(dic['request']['json']['count'] > 1000):
             # Number of items in request over 1000, force asynchronous request, (see link for details)
-            print(
-                'Alert: not all batches loaded, using async request!')
+            logger.info('%s | %s', filename,
+                        'Alert: not all batches loaded, using async request!')
             return self.request_batches_async(get_url)
 
         if(dic['request']['json']['count'] > dic['request']['json']['page_size']):
             # Number of items in request is smaller, than found on page, rerun
-            print(
-                'Alert: count larger than page_size, reran with get_batches(page_size=1000)')
+            logger.info('%s | %s', filename,
+                        'Alert: count larger than page_size, reran with get_batches(page_size=1000)')
             return self.request_batches(page_size=1000)
 
         # Request success
@@ -188,7 +198,7 @@ class ApiCDD():
             # Asynchronoys request failed, return
             message = 'Error: async export request not valid'
             dic['message'] = message
-            print(message)
+            logger.critical('%s | %s', filename, message)
             return dic
 
         # ID and status of asynchronous request
@@ -204,14 +214,14 @@ class ApiCDD():
                 # Checking the asynchronous request failed, return
                 message = 'Error: async check request not valid'
                 dic['message'] = message
-                print(message)
+                logger.critical('%s | %s', filename, message)
                 return dic
 
             # Check status
             export_status = dic['request']['json']['status']
             if(export_status != 'finished'):
-                print('Check request: export_status = %s, sleep for 1 second and recheck' %
-                      export_status)
+                logger.debug('%s | %s', filename, 'Check request: export_status = %s, sleep for 1 second and recheck' %
+                             export_status)
 
             time.sleep(1)
 
@@ -224,7 +234,7 @@ class ApiCDD():
             # Export request failed, return
             message = 'Error: async data download not succeeded'
             dic['message'] = message
-            print(message)
+            logger.critical('%s | %s', filename, message)
             return dic
 
         # Request success
@@ -241,7 +251,8 @@ class ApiCDD():
 
         if(dic['status'] != 200):
             # Request failed, return
-            print(dic['message'])
+            logger.critical('%s | %s', filename, dic['message'])
+            # print(dic['message'])
             return dic
 
         return dic
@@ -267,7 +278,7 @@ class ApiCDD():
         if(request['status'] != 200):
             # Request failed
             dic['request'] = request
-            print(dic['message'])
+            logger.critical('%s | %s', filename, dic['message'])
             return dic
         else:
             # Request success
@@ -304,7 +315,7 @@ class ApiCDD():
         if(request['status'] != 200):
             # Request failed
             dic['request'] = request
-            print(dic['message'])
+            logger.critical('%s | %s', filename, dic['message'])
             return dic
 
         batches = []  # Batches: OUTPUT
@@ -341,7 +352,7 @@ class ApiCDD():
         if(get_response['status'] != 200):
             # Request failed
             dic['request'] = get_response['request']
-            print(dic['message'])
+            logger.critical('%s | %s', filename, dic['message'])
             return dic
 
         batches = get_response['cddResponse']['batches']

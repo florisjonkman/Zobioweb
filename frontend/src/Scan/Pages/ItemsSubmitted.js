@@ -84,13 +84,13 @@ function ItemsSubmitted({
         <CircularProgress />
       ) : allItemsSubmitted ? (
         <Typography variant="h5" gutterBottom className={classes.title}>
-          Items successfully submitted to database.
+          Data changes successfully submitted to CDD.
         </Typography>
       ) : (
         <div>
           <div className={classes.line}>
             <Typography variant="subtitle1" color="error">
-              Not all items successfully submitted to database.
+              Not all data changes successfully submitted to CDD.
             </Typography>
           </div>
           <br />

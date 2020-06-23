@@ -359,7 +359,7 @@ function Delete({ handleChangePage }) {
   };
 
   // Labels of steps
-  const steps = ["Select project", "Scan items"];
+  const steps = ["Select project", "Scan barcodes"];
 
   function getStepContent(step) {
     switch (step) {
@@ -488,7 +488,7 @@ function Delete({ handleChangePage }) {
                 open={openDialog}
                 data={{
                   title:
-                    "Are you sure you want to submit the scanned items to CDD?",
+                    "Are you sure you want to delete the scanned vials from CDD?",
                 }}
                 handleDialog={handleDialog}
                 handleYesDialog={handleYesDialog}

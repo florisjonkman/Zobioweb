@@ -119,7 +119,7 @@ function ScanItems({
             { title: "Box", field: "box", editable: "never" },
             { title: "Position", field: "poslabel", editable: "never" },
             { title: "Status", field: "status", editable: "never" },
-            { title: "Timestamp", field: "timestamp", editable: "never" },
+            // { title: "Timestamp", field: "timestamp", editable: "never" },
             // { title: "User", field: "username", editable: "never" },
           ]}
           localization={{
@@ -176,16 +176,6 @@ function ScanItems({
           {isLoading && <CircularProgress size={35} />}
           {!isLoading && <AddIcon fontSize="large" />}
         </Button>
-
-        {/* // <Button
-          //   name="barcode"
-          //   variant="contained"
-          //   aria-label="add"
-          //   className={classes.button}
-          //   onClick={onSubmit}
-          // >
-          //   <AddIcon fontSize="large" />
-          // </Button> */}
       </div>
     </div>
   );

@@ -427,7 +427,7 @@ function Add({ handleChangePage }) {
   };
 
   // Labels of steps
-  const steps = ["Select project", "Scan items", "Print Labels"];
+  const steps = ["Select project", "Scan barcodes", "Print Labels"];
 
   function getStepContent(step) {
     switch (step) {
@@ -572,8 +572,8 @@ function Add({ handleChangePage }) {
                 open={openDialog}
                 data={{
                   title:
-                    "Are you sure you want to submit the scanned items to CDD?",
-                  body: "The labels must be printed before submitting to CDD.",
+                    "Are you sure you want to add the scanned vials to CDD?",
+                  body: "The labels must be printed and attached to vials before submitting the data to CDD.",
                 }}
                 handleDialog={handleDialog}
                 handleYesDialog={handleYesDialog}

@@ -4,8 +4,7 @@ import logging
 filename = 'box_functions_9x9.py'
 logger = logging.getLogger(filename)
 logger.setLevel(level=logging.INFO)  # When debugging put to loggin.DEBUG
-formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
+formatter = logging.Formatter("%(levelname)s | %(message)s")
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -31,7 +30,8 @@ def location_string_to_array(location):
         pos_int = map_pos_string_to_interger(pos_str)
         box_int = int(box_str)
     except Exception as e:
-        logger.critical('%s  %s', filename, e)
+        logger.error('%s | \'%s\' cannot be splitted  | %s',
+                     filename, location, e)
 
     return [project_name, box_int, pos_int]
 
@@ -54,18 +54,18 @@ def get_last_location_from_batches(batches, request_project_name):
 
     for batch in batches:
         # Loop over all batches
-        if(not batch['Status'] or batch['Status'] == 'Registered'):
+        if((not batch['Status']) or batch['Status'] == 'Registered'):
             continue
 
         # Only batches if status is 'Registered'
 
         name, box_int, pos_int = location_string_to_array(batch['Location'])
 
-        if(name != request_project_name):
-            # This can NEVER occur, to be sure output when it happens
-            message = 'box_function_9x9: get_last_location_from_batches: Strange: LocationPrefix is not the same as request_project_name, cdd_project_name = {0}, request_project_name = {1}!'.format(
-                name, request_project_name)
-            logger.warning('%s  %s', filename, message)
+        # if(name != request_project_name):
+        #     # This can NEVER occur, to be sure output when it happens
+        #     message = 'Strange: LocationPrefix is not the same as request_project_name, cdd_project_name = {0}, request_project_name = {1}!'.format(
+        #         name, request_project_name)
+        #     logger.warning('%s | %s', filename, message)
 
         # Calculate last location
         last_box, last_pos = latest_location(

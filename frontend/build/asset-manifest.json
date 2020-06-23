@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.js": "/static/js/main.b4e92910.chunk.js",
-    "main.js.map": "/static/js/main.b4e92910.chunk.js.map",
+    "main.js": "/static/js/main.faadfc01.chunk.js",
+    "main.js.map": "/static/js/main.faadfc01.chunk.js.map",
     "runtime-main.js": "/static/js/runtime-main.8dc0443e.js",
     "runtime-main.js.map": "/static/js/runtime-main.8dc0443e.js.map",
-    "static/js/2.f4114120.chunk.js": "/static/js/2.f4114120.chunk.js",
-    "static/js/2.f4114120.chunk.js.map": "/static/js/2.f4114120.chunk.js.map",
+    "static/js/2.cddf9be1.chunk.js": "/static/js/2.cddf9be1.chunk.js",
+    "static/js/2.cddf9be1.chunk.js.map": "/static/js/2.cddf9be1.chunk.js.map",
     "index.html": "/index.html",
-    "precache-manifest.e3413050b48390fcc67fc52e5a6828f5.js": "/precache-manifest.e3413050b48390fcc67fc52e5a6828f5.js",
+    "precache-manifest.b3d27020d41b3566a53ae90693e5021c.js": "/precache-manifest.b3d27020d41b3566a53ae90693e5021c.js",
     "service-worker.js": "/service-worker.js",
-    "static/js/2.f4114120.chunk.js.LICENSE.txt": "/static/js/2.f4114120.chunk.js.LICENSE.txt",
+    "static/js/2.cddf9be1.chunk.js.LICENSE.txt": "/static/js/2.cddf9be1.chunk.js.LICENSE.txt",
     "static/media/FridgeIn2.svg": "/static/media/FridgeIn2.22ff45d4.svg",
     "static/media/FridgeOut2.svg": "/static/media/FridgeOut2.fc1742cc.svg",
     "static/media/ZobioLogo.svg": "/static/media/ZobioLogo.41100ac4.svg",
@@ -17,7 +17,7 @@
   },
   "entrypoints": [
     "static/js/runtime-main.8dc0443e.js",
-    "static/js/2.f4114120.chunk.js",
-    "static/js/main.b4e92910.chunk.js"
+    "static/js/2.cddf9be1.chunk.js",
+    "static/js/main.faadfc01.chunk.js"
   ]
 }

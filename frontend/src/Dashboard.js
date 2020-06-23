@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import clsx from "clsx";
 import Cookies from "js-cookie";
+import createActivityDetector from "activity-detector";
 
 import { makeStyles, useTheme } from "@material-ui/core/styles";
 import AppBar from "@material-ui/core/AppBar";
@@ -83,9 +84,33 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+function useIsActive(options) {
+  const [isActive, setIsActive] = React.useState(true);
+  React.useEffect(() => {
+    const activityDetector = createActivityDetector(options);
+    activityDetector.on("idle", () => setIsActive(false));
+    activityDetector.on("active", () => setIsActive(true));
+    return () => activityDetector.stop();
+  }, []);
+  return isActive;
+}
+
+function removeCookies() {
+  Cookies.remove("username");
+  Cookies.remove("fullname");
+  Cookies.remove("token");
+  Cookies.remove("authentication");
+  Cookies.remove("remember");
+  return;
+}
+
 export default function Dashboard(props) {
   // Styles
   const classes = useStyles();
+
+  // Activity monitor
+  const timeToLogout = 30; // in minutes
+  const isActive = useIsActive({ timeToIdle: timeToLogout * 60 * 1000, inactivityEvents: [] });
 
   // Page states
   const [openDrawer, setOpenDrawer] = useState(false); // bool, is the drawer open
@@ -102,14 +127,16 @@ export default function Dashboard(props) {
       event.preventDefault();
       if (!remember) {
         // Only delete cookies, when remember was false
-        console.log("Remember was false, remove all cookies");
-        Cookies.remove("username");
-        Cookies.remove("token");
-        Cookies.remove("authentication");
-        Cookies.remove("remember");
+        removeCookies();
       }
     });
   });
+
+  useEffect(() => {
+    if (!isActive) {
+      window.location.reload();
+    }
+  }, [isActive]);
 
   // Handle function when 'drawer' button is clicked
   const handleDrawerOpen = () => {

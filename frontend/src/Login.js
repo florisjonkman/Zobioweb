@@ -141,7 +141,7 @@ function Login(props) {
               autoComplete="current-password"
               onChange={onChange}
             />
-            <FormControlLabel
+            {/* <FormControlLabel
               control={
                 <Checkbox
                   id="remember"
@@ -153,7 +153,7 @@ function Login(props) {
                 />
               }
               label="Remember me"
-            />
+            /> */}
             <Button
               fullWidth
               variant="contained"

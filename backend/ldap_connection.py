@@ -8,14 +8,13 @@ import logging
 filename = 'ldap_connection.py'
 logger = logging.getLogger(filename)
 logger.setLevel(level=logging.INFO)  # When debugging put to loggin.DEBUG
-formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
+formatter = logging.Formatter("%(levelname)s | %(message)s")
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 # Load password
-ssl_dir = "../ssl/"  # /var/www/backend/ssl/requirements.txt
+ssl_dir = "/var/www/backend/ssl/"  # /var/www/backend/ssl/requirements.txt
 with open(ssl_dir + 'requirements.txt') as json_file:
     requirements = json.load(json_file)
     SERVICE_PWD = requirements['service_account_pwd']
@@ -47,13 +46,13 @@ def ldap_connection(username, password):
         # Could not make connection with LDAP server
         output['message'] = 'LDAP: Service account: Connection with LDAP server failed, error: {0}'.format(
             str(e))
-        logger.critical('%s  %s  %s', filename, username, output['message'])
+        logger.critical('%s | %s | %s', filename, username, output['message'])
         return output
 
     if not result:
         # Failed to connect to the server, username and/or password are INcorrect
         output['message'] = 'LDAP: Service account: could NOT make LDAP connection'
-        logger.critical('%s  %s  %s', filename, username, output['message'])
+        logger.critical('%s | %s | %s', filename, username, output['message'])
         # print(output['message'])
         return output
 
@@ -65,13 +64,13 @@ def ldap_connection(username, password):
         # More than one user found, this cannout occur
         output['message'] = 'LDAP: no account found with e-mail \'{0}\''.format(
             username)
-        logger.warning('%s  %s  %s', filename, username, output['message'])
+        logger.warning('%s | %s | %s', filename, username, output['message'])
         # print(output['message'])
         return output
     elif(len(user_ldap_data) > 1):
         # More than one user found, this cannout occur
         output['message'] = 'LDAP: User account: More users found with this mail-address'
-        logger.warning('%s  %s  %s', filename, username, output['message'])
+        logger.warning('%s | %s | %s', filename, username, output['message'])
         # print(output['message'])
         return output
 
@@ -92,14 +91,14 @@ def ldap_connection(username, password):
         # Could not make connection with LDAP server
         output['message'] = 'LDAP: User account: Connection with LDAP server failed, error: {0}'.format(
             e)
-        logger.critical('%s  %s  %s', filename, username, output['message'])
+        logger.critical('%s | %s | %s', filename, username, output['message'])
         # print(output['message'])
         return output
 
     if not result:
         # Failed to connect to the server, username and/or password are INcorrect
         output['message'] = 'LDAP: User account: could NOT make LDAP connection'
-        logger.critical('%s  %s  %s', filename, username, output['message'])
+        logger.critical('%s | %s | %s', filename, username, output['message'])
         # print(output['message'])
         return output
 
@@ -107,7 +106,7 @@ def ldap_connection(username, password):
     output['status'] = True
     output['message'] = 'LDAP: user \'{0}\' successfully connected with LDAP'.format(
         username)
-    logger.info('%s  %s  %s', filename, username, output['message'])
+    logger.info('%s | %s | %s', filename, username, output['message'])
     # print(output['message'])
     output['userData'] = user_data
 
