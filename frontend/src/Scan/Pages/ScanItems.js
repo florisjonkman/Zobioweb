@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 import {
   makeStyles,
@@ -89,7 +89,6 @@ function ScanItems({
       } else {
         setBarcode("");
       }
-    } else {
     }
   };
 
@@ -119,8 +118,7 @@ function ScanItems({
             { title: "Box", field: "box", editable: "never" },
             { title: "Position", field: "poslabel", editable: "never" },
             { title: "Status", field: "status", editable: "never" },
-            // { title: "Timestamp", field: "timestamp", editable: "never" },
-            // { title: "User", field: "username", editable: "never" },
+            { title: "Container barcode", field: "containerbarcode", editable: "never" }
           ]}
           localization={{
             header: {
@@ -144,7 +142,7 @@ function ScanItems({
           }}
         />
       </ThemeProvider>
-      {isLoading && <LinearProgress/>}
+      {isLoading && <LinearProgress />}
       <div className={classes.buttons}>
         <Chip
           disabled={true}

@@ -3,7 +3,6 @@ import json
 import datetime
 import logging
 
-
 # Set logging
 filename = 'ldap_connection.py'
 logger = logging.getLogger(filename)
@@ -13,8 +12,12 @@ ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-# Load password
-ssl_dir = "/var/www/backend/ssl/"  # /var/www/backend/ssl/requirements.txt
+# Load settings with location of ssl directory
+with open('settings.json') as settings_file:
+    settings = json.load(settings_file)
+    ssl_dir = settings['ssl_directory']
+
+# Load (secret) requirements
 with open(ssl_dir + 'requirements.txt') as json_file:
     requirements = json.load(json_file)
     SERVICE_PWD = requirements['service_account_pwd']
@@ -25,6 +28,16 @@ with open(ssl_dir + 'private_key.pem', 'rb') as key_file:
 
 
 def ldap_connection(username, password):
+    """ Make LDAP connection with Zobio AD, using username and password
+
+    Args:
+        username (str): Zobio-mail as in LDAP, e.g. pjansen@zobio.com
+        password (str): password
+
+    Returns:
+        dic: {status: {bool}, message: {str}, userData: {dic}}
+    """
+
     # LDAP url and host
     host = 'ldap://192.168.60.1'  # URL of LDAP server
     port = 389  # Port to acces server
@@ -53,7 +66,6 @@ def ldap_connection(username, password):
         # Failed to connect to the server, username and/or password are INcorrect
         output['message'] = 'LDAP: Service account: could NOT make LDAP connection'
         logger.critical('%s | %s | %s', filename, username, output['message'])
-        # print(output['message'])
         return output
 
     # Lookup CN of user, using their (mail)
@@ -61,20 +73,18 @@ def ldap_connection(username, password):
                          search_filter='(mail=%s)' % username, attributes=['CN', 'sAMAccountName', 'mail'])
     user_ldap_data = conn.entries
     if(len(user_ldap_data) == 0):
-        # More than one user found, this cannout occur
+        # No user found with this mail-address
         output['message'] = 'LDAP: no account found with e-mail \'{0}\''.format(
             username)
         logger.warning('%s | %s | %s', filename, username, output['message'])
-        # print(output['message'])
         return output
     elif(len(user_ldap_data) > 1):
         # More than one user found, this cannout occur
         output['message'] = 'LDAP: User account: More users found with this mail-address'
         logger.warning('%s | %s | %s', filename, username, output['message'])
-        # print(output['message'])
         return output
 
-    # Extract CN of user
+    # Extract data of user
     ldap_dic = user_ldap_data[0].entry_attributes_as_dict
     user_data['cn'] = ldap_dic['cn'][0]
     user_data['mail'] = ldap_dic['mail'][0]
@@ -82,7 +92,7 @@ def ldap_connection(username, password):
 
     # Setup connection for user
     conn = Connection(server, 'CN=%s,OU=Users,OU=Users,OU=Zobio,DC=zobio,DC=local' % user_data['cn'],
-                      password)  # Setup connection
+                      password)
 
     try:
         # Make connection
@@ -92,14 +102,12 @@ def ldap_connection(username, password):
         output['message'] = 'LDAP: User account: Connection with LDAP server failed, error: {0}'.format(
             e)
         logger.critical('%s | %s | %s', filename, username, output['message'])
-        # print(output['message'])
         return output
 
     if not result:
-        # Failed to connect to the server, username and/or password are INcorrect
+        # Failed to connect to the server, username and password combination is INcorrect
         output['message'] = 'LDAP: User account: could NOT make LDAP connection'
         logger.critical('%s | %s | %s', filename, username, output['message'])
-        # print(output['message'])
         return output
 
     # Succesfully made connection, return
@@ -107,7 +115,6 @@ def ldap_connection(username, password):
     output['message'] = 'LDAP: user \'{0}\' successfully connected with LDAP'.format(
         username)
     logger.info('%s | %s | %s', filename, username, output['message'])
-    # print(output['message'])
     output['userData'] = user_data
 
     return output

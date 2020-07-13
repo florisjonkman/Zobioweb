@@ -1,15 +1,16 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 import forge from "node-forge";
+import publicKeyFile from "./public_key.json";
 
-const host = "http://192.168.60.12:8080"; // "http://localhost:5000" // "http://192.168.60.12:8080"
+const host = "http://localhost:5000"; // "http://localhost:5000" // "http://192.168.60.12:8080"
 
 // Asynchronous function to login to LDAP of Zobio
 export async function fetchCheckLDAP(username, password) {
   console.log("Fetching checking ldap account...");
 
   const publicKey = forge.pki.publicKeyFromPem(
-    process.env.REACT_APP_PUBLIC_KEY
+    publicKeyFile['public_key']
   );
   const encryptedPassword = publicKey.encrypt(password, "RSA-OAEP", {
     md: forge.md.sha256.create(),
@@ -83,7 +84,22 @@ export async function fetchLastPosition(selectedProject) {
     url: host + "/getlastlocation",
     method: "post",
     headers: { Token: token },
-    data: selectedProject,
+    data: { project: selectedProject },
+  });
+
+  return request;
+}
+
+// Asynchronous function to fetch the last occupied postion of the selected project
+export async function fetchPrintLabels(data) {
+  console.log("Fetching printing labels...");
+  const token = Cookies.get("token");
+
+  const request = await axios({
+    url: host + "/printlabels",
+    method: "post",
+    headers: { Token: token },
+    data: { data },
   });
 
   return request;

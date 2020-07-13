@@ -12,6 +12,7 @@
     "@testing-library/user-event": "^7.2.1",
     "activity-detector": "^3.0.0",
     "axios": "^0.19.2",
+    "fs": "0.0.1-security",
     "js-cookie": "^2.2.1",
     "jwt-decode": "^2.2.0",
     "material-table": "^1.57.2",

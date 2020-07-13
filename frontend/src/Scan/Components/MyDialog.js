@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -8,11 +8,11 @@ import DialogActions from "@material-ui/core/DialogActions";
 
 import Button from "@material-ui/core/Button";
 
-function MyDialog({ open, data, handleDialog, handleYesDialog }) {
+function MyDialog({ open, data, handleNo, handleYes }) {
   return (
     <Dialog
       open={open}
-      onClose={handleDialog}
+      onClose={handleNo}
       aria-labelledby="alert-dialog-title"
       aria-describedby="alert-dialog-description"
     >
@@ -25,10 +25,10 @@ function MyDialog({ open, data, handleDialog, handleYesDialog }) {
         </DialogContent>
       )}
       <DialogActions>
-        <Button onClick={handleYesDialog} color="primary">
+        <Button onClick={handleYes} color="primary">
           Yes
         </Button>
-        <Button onClick={handleDialog} color="primary" autoFocus>
+        <Button onClick={handleNo} color="primary" autoFocus>
           No
         </Button>
       </DialogActions>

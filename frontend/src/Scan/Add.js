@@ -9,26 +9,30 @@ import Step from "@material-ui/core/Step";
 import StepLabel from "@material-ui/core/StepLabel";
 import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 import SelectProject from "./Pages/SelectProject";
+import SelectContainer from "./Pages/SelectContainer";
 import ScanItems from "./Pages/ScanItems";
 import ItemsSubmitted from "./Pages/ItemsSubmitted";
 import PrintLabels from "./Pages/PrintLabels";
 import MySnackbar from "./Components/MySnackbar";
 import MyDialog from "./Components/MyDialog";
+import containerTypes from "./Elements/containerTypes.json";
 
 import {
   fetchSendData,
   fetchProjects,
   fetchPosition,
   fetchLastPosition,
+  fetchPrintLabels,
 } from "../ApiFunctions";
 import {
   isBarcodeUnique,
-  formatDate,
+  generateContainerBarcode,
   posIntegerToString,
   posStringToInteger,
-  nextLocation,
+  calculateNextLocation,
 } from "./Functions/ScanFunctions";
 
 // Styles
@@ -85,14 +89,23 @@ function Add({ handleChangePage }) {
   const [openDialog, setOpenDialog] = useState(false); // bool, open the dialog window
 
   // Data submition states
-  const [allItemsSubmitted, setAllItemsSubmitted] = useState(false); // bool, did the submission of all items succeed
+  const [allItemsSubmitted, setAllItemsSubmitted] = useState(false); // bool, did the submission of all items succeeded
   const [failedSubmittedItems, setFailedSubmittedItems] = useState([]); // dic, data of failed submitted items
-
-  // Location of vials states
-  const [lastLocation, setLastLocation] = useState([null, null]); // list [int, int], last occupied position of project, DYNAMIC
-  const [firstLocation, setFirstLocation] = useState([null, null]); // list [int, int], last occupied position as in CDD, STATIC
+  const [isPrintFileSend, setIsPrintFileSend] = useState(false);
 
   // Data states
+
+  // Location of vials states
+  const [firstLocation, setFirstLocation] = useState([0, 0, 0]); // list [int, int, int], last occupied position as in CDD, this is what CDD knows about this project
+  const [lastLocation, setLastLocation] = useState([0, 0, 0]); // list [int, int, int], last occupied position in scanned list
+  const [nextLocation, setNextLocation] = useState([0, 0, 0]); // list [int, int, int], next location to be occupied, changes when more items scanned
+  const [firstLocationBatchData, setFirstLocationBatchData] = useState({}); // batch data of last
+  // first, last and next seems to have strange names here, to explain
+  // * firstLocation, the last known location in CDD which is occupied, this is thus always the first occupied location for the scanned, when all scanned are removed, the lastLocation becomes the firstLocation
+  // * lastLocation, the last location occupied by the scanned items in the list
+  // * nextLocation, the location after the lastLocation
+
+  // Scan and project data states
   const [data, setData] = useState([]); // dic, data of all scanned items
   const [projects, setProjects] = useState([
     {
@@ -101,17 +114,49 @@ function Add({ handleChangePage }) {
       name: "",
     },
   ]); // dic, data of projects, 0 is no project
-  const [selectedProject, setSelectecProject] = useState(projects[0]); // dic, data of selected project
+  const [containers, setContainers] = useState([]); // dic, data of all containers, please check containerTypes.json
+  const [selectedProject, setSelectedProject] = useState(projects[0]); // dic, data of selected project
+  const [selectedContainer, setSelectedContainer] = useState(null); // dic, data of selected container, please check containerTypes.json
+  const [selectedContainerBarcode, setSelectedContainerBarcode] = useState(""); // string, container barcode
 
-  // Load the projects from Database, only once
+  // Reset all data states
+  const resetDataStates = (includingProject = true) => {
+    console.log(
+      "Reset data states, ",
+      includingProject ? "including project" : "without project"
+    );
+    setFirstLocation([0, 0, 0]);
+    setLastLocation([0, 0, 0]);
+    setNextLocation([0, 0, 0]);
+    setFirstLocationBatchData({});
+    setData([]);
+    setSelectedContainer(null);
+    setSelectedContainerBarcode("");
+    if (includingProject) {
+      setSelectedProject(projects[0]);
+    }
+  };
+
+  // Read all containertypes from JSON file and store them in dictionary, only once
+  useEffect(() => {
+    let newContainers = [];
+    containerTypes.forEach((item) => {
+      newContainers.push(item);
+    });
+    setContainers(newContainers);
+  }, []);
+
+  // Load the projects from database, only once
   useEffect(() => {
     setIsLoading(true);
     fetchProjects()
       .then((response) => {
         console.log(response);
-        if (response.status === 200 && response.statusText === "OK") {
-          console.log(response.data["message"]);
-          const array = projects.concat(response.data["output"]["projects"]);
+        if (response.status === 200) {
+          console.log(response.data["backendRequest"]["response"]["message"]);
+          const array = projects.concat(
+            response.data["backendRequest"]["response"]["output"]["projects"]
+          );
           array.forEach((item, index) => {
             array[index].value = index;
           });
@@ -123,46 +168,86 @@ function Add({ handleChangePage }) {
         setIsLoading(false);
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchProjects(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
       });
   }, []);
 
-  // Load the last filled location of the project from Database
+  // Load the last filled location of the project from Database, when selected project is changed
   useEffect(() => {
     if (selectedProject.value !== 0) {
+      // Only if project is selected
       setIsLoading(true);
       fetchLastPosition(selectedProject)
         .then((response) => {
           console.log(response);
-          if (
-            response &&
-            response.status === 200 &&
-            response.statusText === "OK"
-          ) {
-            console.log(response.data["message"]);
-            const [lastBox, lastPos] = response.data["output"][
-              "last location"
-            ].slice(1, 3);
-            setFirstLocation([lastBox, lastPos]);
-            setLastLocation([lastBox, lastPos]);
+          if (response && response.status === 200) {
+            // Correct backend response, print message
+            console.log(response.data["backendRequest"]["response"]["message"]);
+
+            if (
+              !response.data["backendRequest"]["response"]["output"][
+                "hasLastLocation"
+              ]
+            ) {
+              // Project is new, and does not have a occupied location yet
+              resetDataStates(false);
+              setIsLoading(false);
+              return;
+            }
+
+            let container = null;
+            containers.forEach((containerData) => {
+              // Loop over all containertypes
+              if (
+                response.data["backendRequest"]["response"]["output"]["batch"][
+                  "batch_fields"
+                ]["Container type"] === containerData.name
+              ) {
+                // Containertype of Batch, corresponds to known types in containerTypes.json
+                container = containerData;
+                setSelectedContainer(containerData);
+                setSelectedContainerBarcode(
+                  response.data["backendRequest"]["response"]["output"][
+                    "batch"
+                  ]["batch_fields"]["Container barcode"]
+                );
+              }
+            });
+
+            if (!container) {
+              console.error(
+                `Container type: ${response.data["backendRequest"]["response"]["output"]["batch"]["batch_fields"]["Container type"]} not found in CDD. Check if boxTypes.json has the correct types and spelling as in CDD.`
+              );
+            } else {
+              // Container found, set all data
+              const [lastBox, lastRow, lastCol] = response.data[
+                "backendRequest"
+              ]["response"]["output"]["lastLocation"].slice(1, 4);
+              setFirstLocation([lastBox, lastRow, lastCol]);
+              setLastLocation([lastBox, lastRow, lastCol]);
+              setNextLocation(
+                calculateNextLocation(
+                  lastBox,
+                  lastRow,
+                  lastCol,
+                  container.rows,
+                  container.columns
+                )
+              );
+              setFirstLocationBatchData(
+                response.data["backendRequest"]["response"]["output"]["batch"][
+                  "batch_fields"
+                ]
+              );
+            }
           }
           setIsLoading(false);
         })
         .catch((error) => {
-          if (error.response) {
-            console.error(
-              `ERROR fetchLastPosition(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-            );
-          } else {
-            console.error(error);
-          }
+          console.error(error);
+          if (error.response) console.error(error.response);
           setIsLoading(false);
         });
     }
@@ -170,34 +255,69 @@ function Add({ handleChangePage }) {
 
   // When project changed, delete all data
   const handleProjectChange = (event) => {
-    setSelectecProject(projects[event.target.value]);
-    setData([]);
+    resetDataStates();
+    setSelectedProject(projects[event.target.value]);
     setOpenSnackbar(false);
+  };
+
+  // When container changed
+  const handleContainerChange = (containerData) => {
+    const [firstBox] = firstLocation;
+
+    setSelectedContainer(containerData); // Set new contaier type
+    setNextLocation([firstBox + 1, 1, 1]); // Next location is, previous box + 1
+
+    setOpenSnackbar(false);
+    handleNext();
   };
 
   // Data is changed (delete button clicked)
   const handleDataChanged = (newData) => {
-    let box;
-    let pos;
+    let box, row, col;
     newData.forEach((item, index) => {
       newData[index].id = index + 1; // Renumber indeces
       box = newData[index].box; // Select last box
-      pos = posStringToInteger(newData[index].poslabel); // Select last position
+      [row, col] = posStringToInteger(newData[index].poslabel); // Select last position
     });
 
     // Get last location
-    const lastBox = lastLocation[0];
-    const lastPos = lastLocation[1];
+    const [lastBox, lastRow, lastCol] = lastLocation;
 
-    if (!pos && !box) {
+    if (!box && !row && !col) {
       // Empty array, all items are deleted, return to first location from Database
+      const [firstBox, firstRow, firstCol] = firstLocation;
+      setSelectedContainerBarcode(
+        generateContainerBarcode(firstBox, selectedProject.name)
+      );
       setLastLocation(firstLocation);
-    } else if (!(box === lastBox && pos === lastPos)) {
+      setNextLocation(
+        calculateNextLocation(
+          firstBox,
+          firstRow,
+          firstCol,
+          selectedContainer.rows,
+          selectedContainer.columns
+        )
+      );
+    } else if (!(box === lastBox && row === lastRow && col === lastCol)) {
       // If last location in data is NOT equal to lastLocation, reset lastLocation
-      setLastLocation([box, pos]);
+      setLastLocation([box, row, col]);
+      setSelectedContainerBarcode(
+        generateContainerBarcode(box, selectedProject.name)
+      );
+      setNextLocation(
+        calculateNextLocation(
+          box,
+          row,
+          col,
+          selectedContainer.rows,
+          selectedContainer.columns
+        )
+      );
+
       console.log(
         "Latest position NOT the same as lastLocation",
-        `box: ${lastBox} -> ${box}, pos: ${lastPos} -> ${pos}`
+        `box: ${lastBox} -> ${box}, row: ${lastRow} -> ${row}, col: ${lastCol} -> ${col}`
       );
     }
 
@@ -222,9 +342,10 @@ function Add({ handleChangePage }) {
     fetchPosition("Add", barcode, selectedProject)
       .then((response) => {
         console.log(response);
-
-        if (response.status === 200 && response.statusText === "OK") {
-          if (!response.data["output"]["isInCDD"]) {
+        if (response.status === 200) {
+          if (
+            !response.data["backendRequest"]["response"]["output"]["isInCDD"]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -239,7 +360,11 @@ function Add({ handleChangePage }) {
             setOpenSnackbar(true);
             return;
           }
-          if (!response.data["output"]["isInCorrectProject"]) {
+          if (
+            !response.data["backendRequest"]["response"]["output"][
+              "isInCorrectProject"
+            ]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -248,7 +373,11 @@ function Add({ handleChangePage }) {
                   <strong>{barcode}</strong>
                   {" found in different project: "}
                   <strong>
-                    {response.data["output"]["vialData"]["project"]["name"]}
+                    {
+                      response.data["backendRequest"]["response"]["output"][
+                        "batchData"
+                      ]["projects"][0]["name"]
+                    }
                   </strong>
                 </React.Fragment>
               ),
@@ -257,7 +386,11 @@ function Add({ handleChangePage }) {
             setOpenSnackbar(true);
             return;
           }
-          if (!response.data["output"]["isCorrectStatus"]) {
+          if (
+            !response.data["backendRequest"]["response"]["output"][
+              "isCorrectStatus"
+            ]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -266,7 +399,11 @@ function Add({ handleChangePage }) {
                   <strong>{barcode}</strong>
                   {" has incorrect status: "}
                   <strong>
-                    {response.data["output"]["vialData"]["Status"]}
+                    {
+                      response.data["backendRequest"]["response"]["output"][
+                        "batchData"
+                      ]["batch_fields"]["Status"]
+                    }
                   </strong>
                   {"."}
                   <br />
@@ -278,15 +415,28 @@ function Add({ handleChangePage }) {
             setOpenSnackbar(true);
             return;
           }
+          const [lastBox] = lastLocation;
+          const [box, row, col] = nextLocation;
+          let containerbarcode;
+          if (lastBox < box) {
+            containerbarcode = generateContainerBarcode(
+              box,
+              selectedProject.name
+            );
+            setSelectedContainerBarcode(containerbarcode);
+          } else {
+            containerbarcode = selectedContainerBarcode;
+          }
 
           const id = data.length + 1;
           const project = selectedProject;
-          const [box, pos] = nextLocation(lastLocation[0], lastLocation[1]);
-          const poslabel = posIntegerToString(pos);
-          const status = response.data["output"]["vialData"]["Status"];
-          const timestamp = formatDate(new Date(Date.now()));
-          const username = Cookies.get("username");
+          const poslabel = posIntegerToString(row, col);
+          const status =
+            response.data["backendRequest"]["response"]["output"]["batchData"][
+              "batch_fields"
+            ]["Status"];
           const fullname = Cookies.get("fullname");
+          const containertype = selectedContainer.name;
           const newData = data;
 
           newData.push({
@@ -296,14 +446,23 @@ function Add({ handleChangePage }) {
             box,
             poslabel,
             status,
-            timestamp,
-            username,
             fullname,
+            containerbarcode,
+            containertype,
           });
 
           setData(newData); // Update data
 
-          setLastLocation([box, pos]); // Update last location
+          setLastLocation([box, row, col]); // Update last location
+          setNextLocation(
+            calculateNextLocation(
+              box,
+              row,
+              col,
+              selectedContainer.rows,
+              selectedContainer.columns
+            )
+          );
 
           // Give success snackbar
           setDataSnackbar({
@@ -323,18 +482,11 @@ function Add({ handleChangePage }) {
           console.error(response);
         }
         setIsLoading(false);
-        return;
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchPosition(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
-        return;
       });
   };
 
@@ -348,7 +500,7 @@ function Add({ handleChangePage }) {
         body: "No project selected.",
       });
       setOpenSnackbar(true);
-    } else if (activeStep === 1 && data.length === 0) {
+    } else if (activeStep === 2 && data.length === 0) {
       // No data in input
       setDataSnackbar({
         type: "error",
@@ -364,13 +516,32 @@ function Add({ handleChangePage }) {
 
   // Back button is clicked
   const handleBack = () => {
-    setActiveStep(activeStep - 1);
+    if (activeStep === 2) {
+      setOpenDialog(true);
+    } else {
+      setActiveStep(activeStep - 1);
+    }
   };
 
   // Print button is clicked
   const handlePrint = () => {
     console.log("Add: handlePrint: printing data");
     console.log(data);
+
+    setIsLoading(true);
+    fetchPrintLabels(data)
+      .then((response) => {
+        console.log(response);
+        if (response.status === 200) {
+          setIsPrintFileSend(true);
+        }
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (error.response) console.error(error.response);
+        setIsLoading(false);
+      });
   };
 
   // Function if snackbar should be opened/closed
@@ -392,7 +563,7 @@ function Add({ handleChangePage }) {
   };
 
   // If 'Yes' button in dialog at step 4 is clicked, so submit results
-  const handleYesDialog = async () => {
+  const handleSendDataToCDD = async () => {
     handleNext();
     setOpenDialog(false);
     setIsLoading(true);
@@ -400,13 +571,19 @@ function Add({ handleChangePage }) {
     fetchSendData("Add", data)
       .then((response) => {
         console.log(response);
-        if (response.status === 200 && response.statusText === "OK") {
-          console.log(response.data["message"]);
-          if (response.data["output"]["success"]) {
+        if (response.status === 200) {
+          console.log(response.data["backendRequest"]["response"]["message"]);
+          if (
+            response.data["backendRequest"]["response"]["output"]["success"]
+          ) {
             setAllItemsSubmitted(true);
           } else {
             setAllItemsSubmitted(false);
-            setFailedSubmittedItems(response.data["output"]["failedVials"]);
+            setFailedSubmittedItems(
+              response.data["backendRequest"]["response"]["output"][
+                "failedVials"
+              ]
+            );
           }
         } else {
           console.error("ERROR: Request succeeded, but status not 200");
@@ -415,19 +592,19 @@ function Add({ handleChangePage }) {
         setIsLoading(false);
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchSendData(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
       });
   };
 
   // Labels of steps
-  const steps = ["Select project", "Scan barcodes", "Print Labels"];
+  const steps = [
+    "Select project",
+    "Select container",
+    "Scan barcodes",
+    "Print Labels",
+  ];
 
   function getStepContent(step) {
     switch (step) {
@@ -442,6 +619,19 @@ function Add({ handleChangePage }) {
         );
       case 1:
         return (
+          <SelectContainer
+            selectedProject={selectedProject}
+            selectedContainer={selectedContainer}
+            firstLocation={firstLocation}
+            firstLocationBatchData={firstLocationBatchData}
+            containers={containers}
+            onContainerChange={handleContainerChange}
+            isLoading={isLoading}
+            handleNext={handleNext}
+          />
+        );
+      case 2:
+        return (
           <ScanItems
             data={data}
             selectedProject={selectedProject}
@@ -450,9 +640,14 @@ function Add({ handleChangePage }) {
             isLoading={isLoading}
           />
         );
-      case 2:
-        return <PrintLabels />;
       case 3:
+        return (
+          <PrintLabels
+            isLoading={isLoading}
+            isPrintFileSend={isPrintFileSend}
+          />
+        );
+      case 4:
         return (
           <ItemsSubmitted
             isLoading={isLoading}
@@ -468,7 +663,7 @@ function Add({ handleChangePage }) {
   function getButtonContent(step) {
     let contents = [];
 
-    if (step !== 0 && step !== 3) {
+    if (step !== 0 && step !== 4) {
       contents.push(
         <Button
           key="button_back"
@@ -481,7 +676,7 @@ function Add({ handleChangePage }) {
         </Button>
       );
     }
-    if (step === 2) {
+    if (step === 3) {
       contents.push(
         <Button
           key="button_printlabel"
@@ -490,8 +685,9 @@ function Add({ handleChangePage }) {
           variant="contained"
           color="secondary"
           className={classes.button}
+          disabled={isLoading}
         >
-          Print Labels
+          Print
         </Button>
       );
       contents.push(
@@ -502,12 +698,13 @@ function Add({ handleChangePage }) {
           color="primary"
           onClick={handleDialog}
           className={classes.button}
+          disabled={isLoading}
         >
           Submit
         </Button>
       );
     }
-    if (step === 0 || step === 1) {
+    if (step === 0 || step === 2) {
       contents.push(
         <Button
           variant="contained"
@@ -521,8 +718,7 @@ function Add({ handleChangePage }) {
         </Button>
       );
     }
-
-    if (step === 3)
+    if (step === 4)
       contents.push(
         <Button
           variant="contained"
@@ -541,7 +737,41 @@ function Add({ handleChangePage }) {
     return contents;
   }
 
-  //   console.log(stackLocked);
+  function getDialogContent(step) {
+    switch (step) {
+      case 3:
+        return (
+          <MyDialog
+            open={openDialog}
+            data={{
+              title: "Are you sure you want to add the scanned vials to CDD?",
+              body: "All labels must me printed before sending data to CDD.",
+            }}
+            handleNo={handleDialog}
+            handleYes={handleSendDataToCDD}
+          />
+        );
+      case 2:
+        return (
+          <MyDialog
+            open={openDialog}
+            data={{
+              title: "Are you sure you want to go back?",
+              body: "All scanned data will be deleted.",
+            }}
+            handleNo={handleDialog}
+            handleYes={() => {
+              resetDataStates(true);
+              handleDialog();
+              setActiveStep(0);
+            }}
+          />
+        );
+      default:
+        return <React.Fragment></React.Fragment>;
+    }
+  }
+
   return (
     <React.Fragment>
       <CssBaseline />
@@ -568,16 +798,7 @@ function Add({ handleChangePage }) {
                 data={dataSnackbar}
                 handleSnackbar={handleSnackbar}
               />
-              <MyDialog
-                open={openDialog}
-                data={{
-                  title:
-                    "Are you sure you want to add the scanned vials to CDD?",
-                  body: "The labels must be printed and attached to vials before submitting the data to CDD.",
-                }}
-                handleDialog={handleDialog}
-                handleYesDialog={handleYesDialog}
-              />
+              {getDialogContent(activeStep)}
             </React.Fragment>
           </React.Fragment>
         </Paper>

@@ -16,16 +16,8 @@ import ItemsSubmitted from "./Pages/ItemsSubmitted";
 import MySnackbar from "./Components/MySnackbar";
 import MyDialog from "./Components/MyDialog";
 
-import {
-  fetchSendData,
-  fetchProjects,
-  fetchPosition,
-} from "../ApiFunctions";
-import {
-  isBarcodeUnique,
-  formatDate,
-  posIntegerToString,
-} from "./Functions/ScanFunctions";
+import { fetchSendData, fetchProjects, fetchPosition } from "../ApiFunctions";
+import { isBarcodeUnique, posIntegerToString } from "./Functions/ScanFunctions";
 
 // Styles
 const useStyles = makeStyles((theme) => ({
@@ -65,7 +57,11 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function Delete({ handleChangePage }) {
+function Scan({ handleChangePage, type }) {
+  // Different text for different types
+  const [allowedStatusesText, setAllowedStatusesText] = useState("");
+  const [endDialogText, setEndDialogText] = useState("");
+
   // Styles
   const classes = useStyles();
 
@@ -95,15 +91,40 @@ function Delete({ handleChangePage }) {
   ]); // dic, data of projects, 0 is no project
   const [selectedProject, setSelectecProject] = useState(projects[0]); // dic, data of selected project
 
+  useEffect(() => {
+    if (type === "Delete") {
+      setAllowedStatusesText(
+        "Allowed statuses are 'Added', 'Checked in', 'Checked out'."
+      );
+      setEndDialogText(
+        "Are you sure you want to delete the scanned vials from CDD?"
+      );
+    } else if (type === "Check-in") {
+      setAllowedStatusesText(
+        "Only vials with status 'Checked out' can be checked-in."
+      );
+      setEndDialogText(
+        "Are you sure you want to check-in the scanned vials to CDD?"
+      );
+    } else if (type === "Check-out") {
+      setAllowedStatusesText("Allowed statuses are 'Added' and 'Checked in'.");
+      setEndDialogText(
+        "Are you sure you want to check-out the scanned vials from CDD?"
+      );
+    }
+  }, []);
+
   // Load the projects from Database, only once
   useEffect(() => {
     setIsLoading(true);
     fetchProjects()
       .then((response) => {
         console.log(response);
-        if (response.status === 200 && response.statusText === "OK") {
-          console.log(response.data["message"]);
-          const array = projects.concat(response.data["output"]["projects"]);
+        if (response.status === 200) {
+          console.log(response.data["backendRequest"]["response"]["message"]);
+          const array = projects.concat(
+            response.data["backendRequest"]["response"]["output"]["projects"]
+          );
           array.forEach((item, index) => {
             array[index].value = index;
           });
@@ -115,13 +136,8 @@ function Delete({ handleChangePage }) {
         setIsLoading(false);
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchProjects(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
       });
   }, []);
@@ -135,8 +151,6 @@ function Delete({ handleChangePage }) {
 
   // Data is changed (delete button clicked)
   const handleDataChanged = (newData) => {
-    // let box;
-    // let pos;
     newData.forEach((item, index) => {
       newData[index].id = index + 1; // Renumber indeces
     });
@@ -160,11 +174,13 @@ function Delete({ handleChangePage }) {
     }
 
     setIsLoading(true);
-    fetchPosition("Delete", barcode, selectedProject)
+    fetchPosition(type, barcode, selectedProject)
       .then((response) => {
         console.log(response);
-        if (response.status === 200 && response.statusText === "OK") {
-          if (!response.data["output"]["isInCDD"]) {
+        if (response.status === 200) {
+          if (
+            !response.data["backendRequest"]["response"]["output"]["isInCDD"]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -179,7 +195,11 @@ function Delete({ handleChangePage }) {
             setOpenSnackbar(true);
             return;
           }
-          if (!response.data["output"]["isInCorrectProject"]) {
+          if (
+            !response.data["backendRequest"]["response"]["output"][
+            "isInCorrectProject"
+            ]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -188,7 +208,11 @@ function Delete({ handleChangePage }) {
                   <strong>{barcode}</strong>
                   {" found in different project: "}
                   <strong>
-                    {response.data["output"]["vialData"]["project"]["name"]}
+                    {
+                      response.data["backendRequest"]["response"]["output"][
+                      "batchData"
+                      ]["batch_fields"][0]["project"]["name"]
+                    }
                   </strong>
                 </React.Fragment>
               ),
@@ -197,7 +221,11 @@ function Delete({ handleChangePage }) {
             setOpenSnackbar(true);
             return;
           }
-          if (!response.data["output"]["isCorrectStatus"]) {
+          if (
+            !response.data["backendRequest"]["response"]["output"][
+            "isCorrectStatus"
+            ]
+          ) {
             setDataSnackbar({
               type: "error",
               title: "Error",
@@ -206,11 +234,15 @@ function Delete({ handleChangePage }) {
                   <strong>{barcode}</strong>
                   {" has incorrect status: "}
                   <strong>
-                    {response.data["output"]["vialData"]["Status"]}
+                    {
+                      response.data["backendRequest"]["response"]["output"][
+                      "batchData"
+                      ]["batch_fields"]["Status"]
+                    }
                   </strong>
                   {"."}
                   <br />
-                  {"Allowed statuses are 'Added', 'Checked in', 'Checked out'."}
+                  {allowedStatusesText}
                 </React.Fragment>
               ),
             });
@@ -220,12 +252,23 @@ function Delete({ handleChangePage }) {
           }
 
           const id = data.length + 1;
-          const [, box, pos] = response.data["output"]["locationArray"];
-          const project = selectedProject
-          const poslabel = posIntegerToString(pos);
-          const status = response.data["output"]["vialData"]["Status"];
-          const timestamp = formatDate(new Date(Date.now()));
-          const username = Cookies.get("username");
+          const [, box, row, col] = response.data["backendRequest"]["response"][
+            "output"
+          ]["locationArray"];
+          const project = selectedProject;
+          const poslabel = posIntegerToString(row, col);
+          const status =
+            response.data["backendRequest"]["response"]["output"]["batchData"][
+            "batch_fields"
+            ]["Status"];
+          const containerbarcode =
+            response.data["backendRequest"]["response"]["output"]["batchData"][
+            "batch_fields"
+            ]["Container barcode"];
+          const containertype =
+            response.data["backendRequest"]["response"]["output"]["batchData"][
+            "batch_fields"
+            ]["Container type"];
           const fullname = Cookies.get("fullname");
           const newData = data;
 
@@ -236,9 +279,9 @@ function Delete({ handleChangePage }) {
             box,
             poslabel,
             status,
-            timestamp,
-            username,
-            fullname
+            fullname,
+            containerbarcode,
+            containertype,
           });
           setData(newData); // Update data
 
@@ -256,23 +299,14 @@ function Delete({ handleChangePage }) {
             ),
           });
           setOpenSnackbar(true);
-        } else {
-          console.error("ERROR: Request succeeded, but status not 200");
-          console.error(response);
         }
         setIsLoading(false);
         return;
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchPosition(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
-        return;
       });
   };
 
@@ -329,31 +363,31 @@ function Delete({ handleChangePage }) {
     setOpenDialog(false);
     setIsLoading(true);
 
-    fetchSendData("Delete", data)
+    fetchSendData(type, data)
       .then((response) => {
         console.log(response);
-        if (response.status === 200 && response.statusText === "OK") {
-          console.log(response.data["message"]);
-          if (response.data["output"]["success"]) {
+        if (response.status === 200) {
+          console.log(
+            response.data["backendRequest"]["response"]["message"]
+          );
+          if (
+            response.data["backendRequest"]["response"]["output"]["success"]
+          ) {
             setAllItemsSubmitted(true);
           } else {
             setAllItemsSubmitted(false);
-            setFailedSubmittedItems(response.data["output"]["failedVials"]);
+            setFailedSubmittedItems(
+              response.data["backendRequest"]["response"]["output"][
+              "failedVials"
+              ]
+            );
           }
-        } else {
-          console.error("ERROR: Request succeeded, but status not 200");
-          console.error(response);
         }
         setIsLoading(false);
       })
       .catch((error) => {
-        if (error.response) {
-          console.error(
-            `ERROR fetchSendData(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
       });
   };
@@ -464,7 +498,7 @@ function Delete({ handleChangePage }) {
       <main className={classes.layout}>
         <Paper className={classes.paper}>
           <Typography component="h1" variant="h4" align="center">
-            Delete
+            {type}
           </Typography>
           <Stepper activeStep={activeStep} className={classes.stepper}>
             {steps.map((label) => (
@@ -487,11 +521,10 @@ function Delete({ handleChangePage }) {
               <MyDialog
                 open={openDialog}
                 data={{
-                  title:
-                    "Are you sure you want to delete the scanned vials from CDD?",
+                  title: endDialogText,
                 }}
-                handleDialog={handleDialog}
-                handleYesDialog={handleYesDialog}
+                handleNo={handleDialog}
+                handleYes={handleYesDialog}
               />
             </React.Fragment>
           </React.Fragment>
@@ -501,4 +534,4 @@ function Delete({ handleChangePage }) {
   );
 }
 
-export default Delete;
+export default Scan;

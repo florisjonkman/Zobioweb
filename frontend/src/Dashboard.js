@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import Cookies from "js-cookie";
 import createActivityDetector from "activity-detector";
 
-import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
 import CssBaseline from "@material-ui/core/CssBaseline";
@@ -23,9 +23,10 @@ import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 import RightDrawer from "./RightDrawer";
 import HomeScreen from "./Home/HomeScreen";
 import Add from "./Scan/Add";
-import Delete from "./Scan/Delete";
-import CheckIn from "./Scan/CheckIn";
-import CheckOut from "./Scan/CheckOut";
+import Scan from "./Scan/Scan"
+// import Delete from "./Scan/Delete";
+// import CheckIn from "./Scan/CheckIn";
+// import CheckOut from "./Scan/CheckOut";
 import ZobioLogoFlat from "./img/ZobioLogo_Flat.svg";
 
 const drawerWidth = 240;
@@ -195,11 +196,11 @@ export default function Dashboard(props) {
       case "Add":
         return <Add handleChangePage={handleChangePage} />;
       case "Delete":
-        return <Delete handleChangePage={handleChangePage} />;
+        return <Scan handleChangePage={handleChangePage} type={'Delete'} />;
       case "Check-in":
-        return <CheckIn handleChangePage={handleChangePage} />;
+        return <Scan handleChangePage={handleChangePage} type={'Check-in'} />;
       case "Check-out":
-        return <CheckOut handleChangePage={handleChangePage} />;
+        return <Scan handleChangePage={handleChangePage} type={'Check-out'} />;
       default:
         return <HomeScreen handleChangePage={handleChangePage} />;
     }

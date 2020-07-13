@@ -1,0 +1,4 @@
+{
+  "ssl_directory": "../ssl/",
+  "print_directory": "./print/"
+}

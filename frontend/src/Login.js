@@ -1,15 +1,10 @@
 import React, { useState } from "react";
 import Cookies from "js-cookie";
-import axios from "axios";
-import forge from "node-forge";
 
-import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import Button from "@material-ui/core/Button";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import TextField from "@material-ui/core/TextField";
-import FormControlLabel from "@material-ui/core/FormControlLabel";
-import Checkbox from "@material-ui/core/Checkbox";
-import CircularProgress from "@material-ui/core/CircularProgress";
 import LinearProgress from "@material-ui/core/LinearProgress";
 
 import Container from "@material-ui/core/Container";
@@ -69,21 +64,33 @@ function Login(props) {
     fetchCheckLDAP(username, password)
       .then((response) => {
         console.log(response);
-        if (response.status == 200 && response.statusText == "OK") {
-          console.log(response.data["message"]);
+        if (response.status === 200) {
+          console.log(response.data["backendRequest"]["response"]["message"]);
           Auth.setAuth(true);
           Cookies.set(
             "username",
-            response.data["output"]["userData"]["username"],
+            response.data["backendRequest"]["response"]["output"]["userData"][
+              "username"
+            ],
             { expires: 1 }
           );
-          Cookies.set("fullname", response.data["output"]["userData"]["cn"], {
-            expires: 1,
-          });
+          Cookies.set(
+            "fullname",
+            response.data["backendRequest"]["response"]["output"]["userData"][
+              "cn"
+            ],
+            {
+              expires: 1,
+            }
+          );
           Cookies.set("authentication", true, { expires: 1 });
-          Cookies.set("token", response.data["output"]["token"], {
-            expires: 1,
-          });
+          Cookies.set(
+            "token",
+            response.data["backendRequest"]["response"]["output"]["token"],
+            {
+              expires: 1,
+            }
+          );
           Cookies.set("remember", remember, { expires: 1 });
           history.push("/dashboard");
         } else {
@@ -94,13 +101,8 @@ function Login(props) {
       })
       .catch((error) => {
         setIncorrect(true);
-        if (error.response) {
-          console.error(
-            `ERROR fetchCheckLDAP(), status: ${error.response.status}, statusText: ${error.response.statusText}, message: '${error.response.data["message"]}'`
-          );
-        } else {
-          console.error(error);
-        }
+        console.error(error);
+        if (error.response) console.error(error.response);
         setIsLoading(false);
       });
   };

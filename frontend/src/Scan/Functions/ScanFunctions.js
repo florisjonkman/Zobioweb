@@ -1,4 +1,13 @@
-// Check if barcode is unique in dataset
+/**
+ * Check if barcode is unique in dataset
+ *
+ * Arguments:
+ *    @arg {list} data -- data array of all scanned items
+ *    @arg {string} barcode -- barcode string of (newly) scanned item
+ *
+ * Returns:
+ *    @returns {bool} -- true if unique, false if not
+ */
 export function isBarcodeUnique(data, barcode) {
   let isUnique = true;
   data.forEach((item, index) => {
@@ -10,23 +19,17 @@ export function isBarcodeUnique(data, barcode) {
   return isUnique;
 }
 
-// Format dateTime-object to string
+/**
+ * Formats dateTime object to string
+ *
+ * Arguments:
+ *    @arg {dateTime-object} dateTime
+ *
+ * Returns:
+ *    @returns {string} -- HH:MM, DD MMM YYYY
+ */
 export function formatDate(dateTime) {
-  // Settings for HH:MM, DD MMM YYYY
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mrt",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sept",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const monthNames = ["Jan", "Feb", "Mrt", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
   //  Setting for HH:MM, DD MMM YYYY
   let month = monthNames[dateTime.getMonth()];
@@ -46,107 +49,136 @@ export function formatDate(dateTime) {
 /**
  * Returns next box and position
  *
- * @param {integer} box   box [1,inf]
- * @param {integer} pos   position [11,12...18,19,21,22...,28,29,31,32......98,99]
+ * Arguments:
+ *    @arg {integer} box -- box [1,inf]
+ *    @arg {integer} pos -- position [11,12...18,19,21,22...,28,29,31,32......98,99]
  */
-export function nextLocation(box, pos) {
+export function calculateNextLocation(box, row, col, max_rows, max_cols) {
   let nextBox = 1;
-  let nextPos = 11;
+  let nextRow = 1;
+  let nextCol = 1;
 
-  if (!box && !pos) {
+  if (!box && !row && !col) {
     // No correct values given, start with beginning
-    return [nextBox, nextPos];
+    return [nextBox, nextRow, nextCol];
   }
 
-  if (pos >= 99) {
-    // Last position, go to next box
-    nextBox = box + 1;
-    nextPos = 11;
-  } else if (pos % 10 === 9) {
-    // At the end of a row, go to next row (+2), same box
-    nextBox = box;
-    nextPos = pos + 2;
+  if (row >= max_rows) {
+    // Row is in latest row of the box, row up -> next box
+    if (col >= max_cols) {
+      // At the end of an row, so the last column
+      nextBox = box + 1;
+      nextRow = 1;
+      nextCol = 1;
+    } else {
+      // Not at the end of an row, so column 1...,max_cols-1
+      nextBox = box;
+      nextRow = row;
+      nextCol = col + 1;
+    }
   } else {
-    // Same box, next position
-    nextBox = box;
-    nextPos = pos + 1;
+    // Row is NOT latest row of the box, row up -> next row
+    if (col >= max_cols) {
+      // At the end of an row, so the last column
+      nextBox = box;
+      nextRow = row + 1;
+      nextCol = 1;
+    } else {
+      // Not at the end of an row, so column 1...,max_cols-1
+      nextBox = box;
+      nextRow = row;
+      nextCol = col + 1;
+    }
   }
 
-  return [nextBox, nextPos];
+  return [nextBox, nextRow, nextCol];
 }
 
 /**
- * Returns previous box and position
+ * Maps string pos (e.g. A2, H12) to int array (e.g. [1,2], [8,12])
+ * NOTE: Maximum row is currently ZZ, so (26*26+26) = 702 rows. Columns is infinite.
  *
- * @param {integer} box   box [1,inf]
- * @param {integer} pos   position [11,12...18,19,21,22...,28,29,31,32......98,99]
- */
-export function previousLocation(box, pos) {
-  let prevBox = 1;
-  let prevPos = 11;
-
-  // No correct values given, start with beginning
-  if ((!box && !pos) || (box === 1 && pos === 11)) {
-    return [prevBox, prevPos];
-  }
-
-  if (pos <= 11) {
-    // First position, go to previous box
-    prevBox = box - 1;
-    prevPos = 99;
-  } else if (pos % 10 === 1) {
-    // At the beginning of a row, go to prev row (-2), same box
-    prevBox = box;
-    prevPos = pos - 2;
-  } else {
-    // Same box, previous position
-    prevBox = box;
-    prevPos = pos - 1;
-  }
-
-  return [prevBox, prevPos];
-}
-
-/**
- * Maps position in string format [A1,A2,A3,...,I7,I8,I9] format to integer [11,12,13,...,97,98,99] format
+ * Arguments:
+ *    @arg {string} string  -- string of position A1,A2,...A12...,B1,B2,...B12,...,AA1,...,ZZ30
  *
- * @param {string} string   position [A1,A2...A8,A9,B1,B2...,B8,B9,C1,C2......I8,I9]
+ * Returns:
+ *    @returns {list, [rowIndex,colIndex]} -- tuple of row (1,2,3,...,702) and column (1,2,3,...,inf)
  */
+
 export function posStringToInteger(string) {
-  const row = string.substring(0, 1);
-  const col = parseInt(string.substring(1, 2));
+  let numberOfRowChar = 1; // Number of row characters A2 is one, cause one A, AA30, is two
 
-  const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-  const rowIndex = (letters.indexOf(row) + 1) * 10;
-  const colIndex = col;
+  // The charCodeAt(0) function returns an integer representing the Unicode character of the string[0].
+  let rowIndex = string.charCodeAt(0) - 64;
+  if (isAlpha(string.substring(1, 2))) {
+    // Check if second character is letter [A-Z], first character gives base 26 (A=1*26,B=2*26,...), second 1-26
+    rowIndex = 26 * rowIndex + (string.charCodeAt(1) - 64);
+    numberOfRowChar++;
+  }
 
-  const result = rowIndex + colIndex;
+  // Other characters give column index
+  const colIndex = parseInt(string.substring(numberOfRowChar));
 
-  return result;
+  return [rowIndex, colIndex];
 }
 
 /**
- * Maps position in integer [11,12,13,...,97,98,99] format to string format [A1,A2,A3,...,I7,I8,I9]
+ * Checks if character is letter [A-Z]
  *
- * @param {integer} pos   position [11,12...18,19,21,22...,28,29,31,32......98,99]
+ * Arguments:
+ *    @var {string} ch -- character
+ *
+ * Returns:
+ *    @returns {bool}
+ *
  */
-export function posIntegerToString(pos) {
-  const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-  const rowLetter = letters[Math.floor(pos / 10) - 1];
-  const colIndex = pos % 10;
+function isAlpha(ch) {
+  return /^[A-Z]$/i.test(ch);
+}
 
-  const result = rowLetter + colIndex.toString();
+/**
+ * Maps int array of pos (e.g. [1,2], [8,12]) to string (e.g. A2, H12)
+ * NOTE: Maximum row is currently ZZ, so (26*26+26) = 702 rows. Columns is infinite.
+ *
+ * Arguments:
+ *    @arg {int} row  -- row number
+ *    @arg {int} col  -- column number
+ *
+ * Returns:
+ *    @returns {string} -- string of position
+ */
+export function posIntegerToString(row, col) {
+  let rowLetters;
+  if (row <= 26) {
+    // If below 26 characters give letter of row (65=A,66=B,...,Z=90)
+    rowLetters = String.fromCharCode(64 + row);
+  } else {
+    // If above 26 charcters two letters are given AA,...,ZZ
+    const nBase26 = Math.floor((row - 1) / 26);
+    const firstLetter = String.fromCharCode(64 + nBase26);
+    const secondLetter = String.fromCharCode(64 + row - nBase26 * 26);
+    rowLetters = firstLetter + secondLetter;
+  }
+
+  const result = rowLetters + col.toString();
 
   return result;
 }
+/**
+ *
+ * @param {int} box -- Box number
+ * @param {string} projectName -- Project name
+ */
+export function generateContainerBarcode(box, projectName) {
+  let containerBarcode = "";
+  let base = "0000";
+  let n = "1";
 
-export function sendMail(body) {
-  var link =
-    "mailto:fjonkman@zobio.com?" +
-    "subject=" +
-    escape("Scanned items failed") +
-    "&body=" +
-    escape(body);
+  if (!box) {
+    containerBarcode = projectName + "-" + (base + n).slice(-base.length);
+  } else {
+    containerBarcode = projectName + "-" + (base + box).slice(-base.length);
+  }
 
-  window.open(link, "_blank");
+  return containerBarcode;
 }

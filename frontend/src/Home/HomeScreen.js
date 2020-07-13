@@ -1,18 +1,16 @@
-import React, { useState } from "react";
+import React from "react";
 
-import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import Avatar from "@material-ui/core/Avatar";
 import Card from "@material-ui/core/Card";
 import CardActionArea from "@material-ui/core/CardActionArea";
 import CardHeader from "@material-ui/core/CardHeader";
 import Link from "@material-ui/core/Link";
 
-import GetAppIcon from "@material-ui/icons/GetApp";
-import PublishIcon from "@material-ui/icons/Publish";
 import CloseIcon from "@material-ui/icons/Close";
 import AddIcon from "@material-ui/icons/Add";
-import CheckInIcon from "../img/FridgeIn2.svg";
-import CheckOutIcon from "../img/FridgeOut2.svg";
+import CheckInIcon from "../img/FridgeIn.svg";
+import CheckOutIcon from "../img/FridgeOut.svg";
 
 const useStyles = makeStyles((theme) => ({
   buttons: {

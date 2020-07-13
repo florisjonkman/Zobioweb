@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import MaterialTable from "material-table";
 
 import { makeStyles } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
-import Select from "@material-ui/core/Select";
 import Paper from "@material-ui/core/Paper";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
@@ -37,33 +36,37 @@ const TableBarcodes = (props) => {
       components={{
         Container: (props) => <Paper {...props} elevation={0} />,
       }}
+      style={{
+        whiteSpace: "normal",
+        wordWrap: "break-word"
+      }}
       title="Response from CDD"
       options={{
         paging: false,
         search: false,
         showTitle: true,
         toolbar: true,
-        exportButton: true,
+        exportButton: false,
         exportFileName: "FailedSubmittedBarcodes",
         rowStyle: { height: 10 },
       }}
       columns={[
-        { title: "CDD ID", field: "id", editable: "never" },
-        { title: "Vial barcode", field: "barcode", editable: "never" },
-        { title: "CDD Status", field: "status", editable: "never" },
-        { title: "CDD Location", field: "location", editable: "never" },
+        {
+          title: "Vial barcode", field: "barcode", editable: "never",
+          render: (rowData) => rowData["scanData"]['barcode'],
+        },
         {
           title: "CDD Response",
           field: "message",
           editable: "never",
-          render: (rowData) => rowData["post response"]["message"],
+          render: (rowData) => rowData["postResponse"]["message"],
         },
         {
           title: "CDD Response",
           field: "cddResponse",
           editable: "never",
           render: (rowData) =>
-            JSON.stringify(rowData["post response"]["response"]),
+            JSON.stringify(rowData["postResponse"]["response"]),
         },
       ]}
       data={props.data}
@@ -87,23 +90,23 @@ function ItemsSubmitted({
           Data changes successfully submitted to CDD.
         </Typography>
       ) : (
-        <div>
-          <div className={classes.line}>
-            <Typography variant="subtitle1" color="error">
-              Not all data changes successfully submitted to CDD.
+            <div>
+              <div className={classes.line}>
+                <Typography variant="subtitle1" color="error">
+                  Not all data changes successfully submitted to CDD.
             </Typography>
-          </div>
-          <br />
-          <TableBarcodes
-            data={failedSubmittedItems}
-            className={classes.block}
-          />
-          <br />
-          <div className={classes.line}>
-            <Typography variant="subtitle1">Please report to Stijn</Typography>
-          </div>
-        </div>
-      )}
+              </div>
+              <br />
+              <TableBarcodes
+                data={failedSubmittedItems}
+                className={classes.block}
+              />
+              <br />
+              <div className={classes.line}>
+                <Typography variant="subtitle1">Please report to Stijn</Typography>
+              </div>
+            </div>
+          )}
     </div>
   );
 }

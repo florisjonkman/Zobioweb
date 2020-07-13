@@ -45,7 +45,7 @@ const theme = createMuiTheme({
 });
 
 function App() {
-  const [auth, setAuth, deleteAuth] = useCookie("authentication", false);
+  const [auth, setAuth] = useCookie("authentication", false);
 
   return (
     <MuiThemeProvider theme={theme}>
@@ -66,8 +66,8 @@ function ProtectedRoute({ auth, component: Component, ...rest }) {
         auth ? (
           <Component {...props} />
         ) : (
-          <Redirect to={{ pathname: "/login" }} />
-        )
+            <Redirect to={{ pathname: "/login" }} />
+          )
       }
     />
   );
@@ -81,8 +81,8 @@ function ProtectedLogin({ auth, component: Component, ...rest }) {
         !auth ? (
           <Component {...props} />
         ) : (
-          <Redirect to={{ pathname: "/dashboard" }} />
-        )
+            <Redirect to={{ pathname: "/dashboard" }} />
+          )
       }
     />
   );
